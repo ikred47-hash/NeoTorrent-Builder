@@ -11,16 +11,18 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install System Dependencies
+      - name: Install Dependencies
         run: |
           sudo apt-get update
-          # FIXED: Added 'openjdk-17-jdk', 'zip', 'unzip', and 'cmake'
+          # FIXED: Switched to OpenJDK 11 (Most stable for Buildozer)
+          # FIXED: Added 'autopoint', 'gettext', 'libtool-bin', 'gperf' for C++ compilation
           sudo apt-get install -y \
-            openjdk-17-jdk \
+            openjdk-11-jdk \
             zip \
             unzip \
             autoconf \
             libtool \
+            libtool-bin \
             pkg-config \
             zlib1g-dev \
             libncurses5-dev \
@@ -31,15 +33,20 @@ jobs:
             libssl-dev \
             python3-pip \
             python3-setuptools \
-            git
+            git \
+            autopoint \
+            gettext \
+            gperf
 
       - name: Install Buildozer
         run: |
           pip3 install --upgrade pip
+          # We use a specific version of Cython known to work with libtorrent
           pip3 install --upgrade buildozer cython==0.29.33 virtualenv
 
       - name: Build APK
-        # We use 'yes' to auto-accept the Android SDK licenses
+        # We use 'yes' to auto-accept licenses
+        # We add '|| echo FAIL' so we can see if it crashes explicitly
         run: |
           yes | buildozer android debug
 

@@ -14,11 +14,13 @@ from kivy.graphics import Color, RoundedRectangle
 from kivy.utils import platform
 from kivy.core.window import Window
 from kivy.metrics import dp
-import requests  # <--- This matches your buildozer.spec
 import threading
 import os
+import traceback # To catch errors
 
-# --- 1. THEME (Dark Matter) ---
+# NOTE: We do NOT import requests here. We import it later.
+
+# --- THEME ---
 COLOR_BG = (0.05, 0.05, 0.07, 1)
 COLOR_CARD = (0.12, 0.14, 0.18, 1)
 COLOR_ACCENT = (0, 0.85, 1, 1)
@@ -26,7 +28,6 @@ COLOR_TEXT_MAIN = (1, 1, 1, 1)
 COLOR_TEXT_SUB = (0.7, 0.7, 0.8, 1)
 COLOR_INPUT_BG = (0.2, 0.22, 0.25, 1)
 
-# --- 2. COMPONENTS ---
 class RoundedButton(Button):
     def __init__(self, btn_color=COLOR_ACCENT, text_color=(0,0,0,1), radius=[10], **kwargs):
         self.btn_color = btn_color
@@ -92,20 +93,17 @@ class DownloadCard(BoxLayout):
             self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[15])
         self.bind(pos=self.update_rect, size=self.update_rect)
 
-        # Title
         self.title_lbl = Label(text=filename, font_size='16sp', bold=True, 
                                color=COLOR_TEXT_MAIN, halign='left', size_hint_y=None, height=dp(25),
                                shorten=True, shorten_from='right')
         self.title_lbl.bind(size=self.title_lbl.setter('text_size'))
         self.add_widget(self.title_lbl)
 
-        # Progress
         self.progress = ProgressBar(max=100, value=0, size_hint_y=None, height=dp(10))
         self.add_widget(self.progress)
 
-        # Stats
         stats = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(25))
-        self.speed_lbl = Label(text="Downloading...", color=COLOR_ACCENT, font_size='13sp', bold=True, halign='left')
+        self.speed_lbl = Label(text="Initializing...", color=COLOR_ACCENT, font_size='13sp', bold=True, halign='left')
         self.speed_lbl.bind(size=self.speed_lbl.setter('text_size'))
         self.state_lbl = Label(text="0%", color=COLOR_TEXT_SUB, font_size='12sp', halign='right')
         self.state_lbl.bind(size=self.state_lbl.setter('text_size'))
@@ -113,24 +111,13 @@ class DownloadCard(BoxLayout):
         stats.add_widget(self.state_lbl)
         self.add_widget(stats)
 
-        # Controls
         controls = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40), spacing=dp(10))
-        
-        # Stream Toggle
-        stream_box = BoxLayout(orientation='horizontal', spacing=dp(5))
-        stream_lbl = Label(text="Stream:", color=COLOR_TEXT_SUB, font_size='12sp')
-        self.stream_switch = Switch(active=False)
-        stream_box.add_widget(stream_lbl)
-        stream_box.add_widget(self.stream_switch)
-        controls.add_widget(stream_box)
-
-        # Delete Button
         del_btn = RoundedButton(text="DELETE", text_color=(1,1,1,1), btn_color=(0.8, 0.2, 0.2, 1), size_hint_x=0.4)
         del_btn.bind(on_press=self.delete_download)
         controls.add_widget(del_btn)
         self.add_widget(controls)
         
-        # Start Download
+        # Start Thread
         threading.Thread(target=self.start_download, daemon=True).start()
 
     def update_rect(self, *args):
@@ -139,8 +126,11 @@ class DownloadCard(BoxLayout):
 
     def start_download(self):
         try:
+            # LAZY IMPORT: We import requests here so the app doesn't crash on launch if it's missing
+            import requests
+            
             path = os.path.join(self.app.save_path, self.filename)
-            response = requests.get(self.url, stream=True)
+            response = requests.get(self.url, stream=True, verify=False) # verify=False avoids SSL crashes
             total_length = response.headers.get('content-length')
 
             if total_length is None:
@@ -156,8 +146,11 @@ class DownloadCard(BoxLayout):
                         done = int(100 * dl / total_length)
                         Clock.schedule_once(lambda dt, p=done: self.update_progress(p))
                 self.finish_download()
-        except:
-            Clock.schedule_once(lambda dt: self.update_status("Error"))
+        except Exception as e:
+            # PRINT ERROR TO SCREEN
+            err_msg = str(traceback.format_exc())
+            Clock.schedule_once(lambda dt: self.update_status("Error: " + str(e)))
+            print(err_msg)
 
     def update_progress(self, val):
         self.progress.value = val
@@ -177,11 +170,6 @@ class DownloadCard(BoxLayout):
     def delete_download(self, instance):
         self.app.remove_card(self)
 
-    def remove_card(self, card):
-        if card in self.app.all_cards:
-            self.app.all_cards.remove(card)
-        self.app.refresh_list_visibility()
-
 class EmptyState(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -190,45 +178,37 @@ class EmptyState(BoxLayout):
         self.size_hint_y = None
         self.height = dp(400)
         self.pos_hint = {'center_x': 0.5, 'center_y': 0.5}
-        self.add_widget(Label(text="📦", font_size='80sp', size_hint_y=None, height=dp(100)))
-        self.add_widget(Label(text="No downloads in this tab.", font_size='16sp', color=COLOR_TEXT_SUB, halign='center'))
+        # FIXED: Removed Emoji, using text instead to prevent Font Crash
+        self.add_widget(Label(text="[ NO FILES ]", font_size='24sp', bold=True, color=COLOR_TEXT_SUB, size_hint_y=None, height=dp(50)))
+        self.add_widget(Label(text="Tap + to add a download", font_size='16sp', color=COLOR_TEXT_SUB, halign='center'))
 
 class NeoSapphirePro(App):
     def build(self):
-        self.filter_mode = 'all' # options: 'all', 'active', 'done'
+        self.filter_mode = 'all'
         self.save_path = self.get_download_path()
         Window.clearcolor = COLOR_BG
         
         self.root = FloatLayout()
-        
-        # PADDING FIX
         main_box = BoxLayout(orientation='vertical', padding=[dp(0), dp(50), dp(0), dp(0)])
         
-        # 1. HEADER
+        # Header
         header = BoxLayout(size_hint_y=None, height=dp(60), padding=[dp(20), 0, dp(20), 0])
         title = Label(text="NeoPro", font_size='26sp', bold=True, color=COLOR_ACCENT, halign='left')
         title.bind(size=title.setter('text_size'))
-        
-        settings_btn = Button(text="⚙", font_size='24sp', size_hint=(None, None), size=(dp(40), dp(40)),
-                              background_color=(0,0,0,0), color=COLOR_TEXT_SUB)
-        settings_btn.bind(on_press=self.show_settings)
-        
         header.add_widget(title)
-        header.add_widget(settings_btn)
         main_box.add_widget(header)
 
-        # 2. TABS
+        # Tabs
         tabs_box = BoxLayout(size_hint_y=None, height=dp(50), padding=[dp(10), 0])
         self.tab_all = TabButton(text="ALL", mode='all', app_ref=self, state='down')
         self.tab_dl = TabButton(text="ACTIVE", mode='active', app_ref=self)
         self.tab_done = TabButton(text="DONE", mode='done', app_ref=self)
-        
         tabs_box.add_widget(self.tab_all)
         tabs_box.add_widget(self.tab_dl)
         tabs_box.add_widget(self.tab_done)
         main_box.add_widget(tabs_box)
 
-        # 3. LIST
+        # List
         self.scroll = ScrollView()
         self.list_layout = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(15), padding=dp(15))
         self.list_layout.bind(minimum_height=self.list_layout.setter('height'))
@@ -241,7 +221,7 @@ class NeoSapphirePro(App):
         main_box.add_widget(self.scroll)
         self.root.add_widget(main_box)
 
-        # 4. FAB
+        # FAB
         self.fab = RoundedButton(text="+", font_size='32sp', size_hint=(None, None), size=(dp(60), dp(60)), 
                                  pos_hint={'right': 0.95, 'y': 0.05}, btn_color=COLOR_ACCENT, radius=[dp(30)])
         self.fab.bind(on_press=self.show_add_popup)
@@ -250,19 +230,22 @@ class NeoSapphirePro(App):
         return self.root
 
     def get_download_path(self):
+        # Fallback to internal storage if external fails permissions
         if platform == 'android':
             try:
                 from android.storage import primary_external_storage_path
-                return os.path.join(primary_external_storage_path(), 'Download')
-            except: return os.path.expanduser("~") 
+                path = os.path.join(primary_external_storage_path(), 'Download')
+                if not os.path.exists(path): os.makedirs(path)
+                return path
+            except: 
+                return self.user_data_dir # Safer fallback
         return os.path.join(os.path.expanduser("~"), "Downloads")
 
     def show_add_popup(self, instance):
         content = BoxLayout(orientation='vertical', padding=dp(20), spacing=dp(20))
-        self.link_input = TextInput(hint_text="Paste Link (MP4/Zip)...", multiline=False, size_hint_y=None, height=dp(50),
+        self.link_input = TextInput(hint_text="Paste Link...", multiline=False, size_hint_y=None, height=dp(50),
                                     background_normal='', background_color=COLOR_INPUT_BG, 
-                                    foreground_color=COLOR_TEXT_MAIN, cursor_color=COLOR_ACCENT,
-                                    hint_text_color=(0.5, 0.5, 0.5, 1))
+                                    foreground_color=COLOR_TEXT_MAIN, cursor_color=COLOR_ACCENT)
         content.add_widget(self.link_input)
         add_btn = RoundedButton(text="DOWNLOAD", size_hint_y=None, height=dp(50), btn_color=(0, 0.8, 0, 1))
         add_btn.bind(on_press=self.add_download)
@@ -270,20 +253,6 @@ class NeoSapphirePro(App):
         self.popup = Popup(title="New Download", title_color=COLOR_ACCENT, content=content, 
                            size_hint=(0.9, 0.4), separator_color=COLOR_ACCENT, background_color=COLOR_CARD)
         self.popup.open()
-
-    def show_settings(self, instance):
-        content = BoxLayout(orientation='vertical', padding=dp(20), spacing=dp(10))
-        content.add_widget(Label(text="Wi-Fi Only", color=COLOR_TEXT_SUB))
-        content.add_widget(Switch(active=True))
-        content.add_widget(Label(text="Dark Mode", color=COLOR_TEXT_SUB))
-        content.add_widget(Switch(active=True))
-        
-        btn = RoundedButton(text="CLOSE", size_hint_y=None, height=dp(50))
-        popup = Popup(title="Settings", title_color=COLOR_ACCENT, content=content, 
-                      size_hint=(0.8, 0.5), separator_color=COLOR_ACCENT, background_color=COLOR_CARD)
-        btn.bind(on_press=popup.dismiss)
-        content.add_widget(btn)
-        popup.open()
 
     def add_download(self, instance):
         link = self.link_input.text.strip()
@@ -294,6 +263,10 @@ class NeoSapphirePro(App):
             self.all_cards.append(card)
             self.refresh_list_visibility()
             self.popup.dismiss()
+
+    def remove_card(self, card):
+        if card in self.all_cards: self.all_cards.remove(card)
+        self.refresh_list_visibility()
 
     def refresh_list_visibility(self):
         visible_count = 0

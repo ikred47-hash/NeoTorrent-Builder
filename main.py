@@ -14,17 +14,17 @@ from kivy.graphics import Color, RoundedRectangle
 from kivy.utils import platform
 from kivy.core.window import Window
 from kivy.metrics import dp
-import requests
+import requests  # <--- This matches your buildozer.spec
 import threading
 import os
 
 # --- 1. THEME (Dark Matter) ---
-COLOR_BG = (0.05, 0.05, 0.07, 1)      # Deep Black/Navy
-COLOR_CARD = (0.12, 0.14, 0.18, 1)    # Dark Grey Card
-COLOR_ACCENT = (0, 0.85, 1, 1)        # Neon Cyan
-COLOR_TEXT_MAIN = (1, 1, 1, 1)        # Pure White
-COLOR_TEXT_SUB = (0.7, 0.7, 0.8, 1)   # Light Grey
-COLOR_INPUT_BG = (0.2, 0.22, 0.25, 1) # Visible Input Box
+COLOR_BG = (0.05, 0.05, 0.07, 1)
+COLOR_CARD = (0.12, 0.14, 0.18, 1)
+COLOR_ACCENT = (0, 0.85, 1, 1)
+COLOR_TEXT_MAIN = (1, 1, 1, 1)
+COLOR_TEXT_SUB = (0.7, 0.7, 0.8, 1)
+COLOR_INPUT_BG = (0.2, 0.22, 0.25, 1)
 
 # --- 2. COMPONENTS ---
 class RoundedButton(Button):
@@ -116,7 +116,7 @@ class DownloadCard(BoxLayout):
         # Controls
         controls = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40), spacing=dp(10))
         
-        # Stream Toggle (Visual Dummy for this version)
+        # Stream Toggle
         stream_box = BoxLayout(orientation='horizontal', spacing=dp(5))
         stream_lbl = Label(text="Stream:", color=COLOR_TEXT_SUB, font_size='12sp')
         self.stream_switch = Switch(active=False)
@@ -166,7 +166,6 @@ class DownloadCard(BoxLayout):
     def finish_download(self):
         self.is_finished = True
         Clock.schedule_once(lambda dt: self.update_status("Done"))
-        # Refresh tabs to move this item to "Done" tab if needed
         Clock.schedule_once(lambda dt: self.app.refresh_list_visibility())
 
     def update_status(self, msg):
@@ -177,6 +176,11 @@ class DownloadCard(BoxLayout):
 
     def delete_download(self, instance):
         self.app.remove_card(self)
+
+    def remove_card(self, card):
+        if card in self.app.all_cards:
+            self.app.all_cards.remove(card)
+        self.app.refresh_list_visibility()
 
 class EmptyState(BoxLayout):
     def __init__(self, **kwargs):
@@ -197,7 +201,7 @@ class NeoSapphirePro(App):
         
         self.root = FloatLayout()
         
-        # PADDING FIX: dp(50) top padding clears the notch
+        # PADDING FIX
         main_box = BoxLayout(orientation='vertical', padding=[dp(0), dp(50), dp(0), dp(0)])
         
         # 1. HEADER
@@ -205,7 +209,6 @@ class NeoSapphirePro(App):
         title = Label(text="NeoPro", font_size='26sp', bold=True, color=COLOR_ACCENT, halign='left')
         title.bind(size=title.setter('text_size'))
         
-        # SETTINGS BUTTON (Functional)
         settings_btn = Button(text="⚙", font_size='24sp', size_hint=(None, None), size=(dp(40), dp(40)),
                               background_color=(0,0,0,0), color=COLOR_TEXT_SUB)
         settings_btn.bind(on_press=self.show_settings)
@@ -214,7 +217,7 @@ class NeoSapphirePro(App):
         header.add_widget(settings_btn)
         main_box.add_widget(header)
 
-        # 2. TABS (Functional)
+        # 2. TABS
         tabs_box = BoxLayout(size_hint_y=None, height=dp(50), padding=[dp(10), 0])
         self.tab_all = TabButton(text="ALL", mode='all', app_ref=self, state='down')
         self.tab_dl = TabButton(text="ACTIVE", mode='active', app_ref=self)
@@ -292,26 +295,17 @@ class NeoSapphirePro(App):
             self.refresh_list_visibility()
             self.popup.dismiss()
 
-    def remove_card(self, card):
-        if card in self.all_cards: self.all_cards.remove(card)
-        self.refresh_list_visibility()
-
     def refresh_list_visibility(self):
-        # The Logic to SHOW/HIDE based on tabs
         visible_count = 0
         self.list_layout.clear_widgets()
-        
         for card in self.all_cards:
             should_show = False
             if self.filter_mode == 'all': should_show = True
             elif self.filter_mode == 'active' and not card.is_finished: should_show = True
             elif self.filter_mode == 'done' and card.is_finished: should_show = True
-            
             if should_show:
                 self.list_layout.add_widget(card)
                 visible_count += 1
-        
-        # Handle Empty State
         if visible_count == 0:
             self.list_layout.add_widget(self.empty_state)
 

@@ -8,7 +8,7 @@ version = 1.0
 
 # THE ENGINE
 # We remove 'openssl' here to avoid the conflict that killed Colab
-requirements = python3,kivy,android,requests,openssl
+requirements = python3,kivy,android,requests,openssl,certifi
 
 # PERMISSIONS (Ironclad)
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,ACCESS_NETWORK_STATE,WAKE_LOCK,FOREGROUND_SERVICE

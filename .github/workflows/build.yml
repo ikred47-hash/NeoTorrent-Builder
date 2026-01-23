@@ -5,7 +5,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    # THE FIX: We use Ubuntu 20.04 (Focal) which has OpenSSL 1.1
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Checkout Code
@@ -14,8 +15,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          # FIXED: Switched to OpenJDK 11 (Most stable for Buildozer)
-          # FIXED: Added 'autopoint', 'gettext', 'libtool-bin', 'gperf' for C++ compilation
+          # We install Java 11 and the critical C++ tools
           sudo apt-get install -y \
             openjdk-11-jdk \
             zip \
@@ -41,12 +41,11 @@ jobs:
       - name: Install Buildozer
         run: |
           pip3 install --upgrade pip
-          # We use a specific version of Cython known to work with libtorrent
+          # We lock Cython to 0.29.33 which is stable for this build
           pip3 install --upgrade buildozer cython==0.29.33 virtualenv
 
       - name: Build APK
-        # We use 'yes' to auto-accept licenses
-        # We add '|| echo FAIL' so we can see if it crashes explicitly
+        # The 'yes' command forces acceptance of the SDK license
         run: |
           yes | buildozer android debug
 

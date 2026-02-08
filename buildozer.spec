@@ -6,7 +6,7 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 1.0.0
 
-# Pinning Python 3.11 is mandatory
+# REQUIREMENTS: Standard 'libtorrent' recipe + Python 3.11
 requirements = python3==3.11, kivy==2.3.0, libtorrent, openssl, requests, certifi, chardet, idna, urllib3, hostpython3
 
 p4a.branch = master

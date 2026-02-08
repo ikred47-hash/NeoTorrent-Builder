@@ -21,34 +21,30 @@ jobs:
             cmake patch unzip zip libssl-dev libffi-dev zlib1g-dev \
             openjdk-17-jdk m4 libboost-all-dev autoconf-archive
 
-      - name: Fix Autotools Macro Paths
+      - name: Clean & Prep
         run: |
-          # Links macros so autoreconf can find libtoolize definitions
+          # Links macros and clears any stuck locks from previous failures
           sudo ln -s /usr/share/aclocal /usr/local/share/aclocal || true
+          rm -rf .buildozer/
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install Buildozer & Cython
-        run: |
-          pip install --upgrade pip
-          # Pinned Cython 0.29.33 ensures stable C++ code generation
-          pip install "Cython==0.29.33" buildozer setuptools
-
       - name: Build Android APK
         run: |
-          # Clean old corrupted artifacts and trigger build
-          rm -rf .buildozer/
+          pip install --upgrade pip
+          # Cython 0.29.33 is the only version that reliably compiles libtorrent
+          pip install "Cython==0.29.33" buildozer setuptools
           yes | buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"
-          # Ignores system NDK to prevent architecture conflicts
+          # Force the use of the clean NDK download
           ANDROID_NDK_HOME: "" 
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NeoOnyx-Beta-v1

@@ -7,16 +7,12 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # Switching to 22.04 is the most reliable "fix" for Buildozer in 2026
+    # Ubuntu 22.04 is currently more stable for NDK cross-compilation than 24.04
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
 
       - name: Install System Dependencies
         run: |
@@ -24,32 +20,37 @@ jobs:
           sudo apt-get install -y \
             build-essential autoconf automake libtool pkg-config \
             cmake patch unzip zip libssl-dev libffi-dev zlib1g-dev \
-            openjdk-17-jdk m4 libncurses5
+            openjdk-17-jdk m4 libboost-all-dev libncurses5
 
-      - name: Clean & Prep Build Environment
+      - name: Fix Autotools Macro Paths
         run: |
-          # Kill any existing build locks and old artifacts
-          rm -rf .buildozer/
-          mkdir -p .buildozer/android/platform/
+          # Links the required m4 macros for the libtorrent autoreconf step
+          sudo ln -s /usr/share/aclocal /usr/local/share/aclocal || true
 
-      - name: Install Buildozer & Cython
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Buildozer & Fixed Cython
         run: |
           pip install --upgrade pip
-          # Cython 0.29.33 is essential for the libtorrent recipe to compile correctly
+          # Cython 0.29.33 is essential for the libtorrent C++ bindings
           pip install "Cython==0.29.33" buildozer setuptools
 
       - name: Build Android APK
         run: |
-          # Force a deep-clean and then build
+          # Delete any previous failed build data to prevent "Broken Pipe" errors
+          rm -rf .buildozer/
           yes | buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"
-          # Hide NDK 27 from the build tools
+          # Ensure the build ignores the runner's pre-installed NDK 27
           ANDROID_NDK_HOME: "" 
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NeoOnyx-Stable-Beta
+          name: NeoOnyx-Beta-v1
           path: bin/*.apk

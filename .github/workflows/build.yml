@@ -10,8 +10,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install System Dependencies
         run: |
@@ -19,29 +18,27 @@ jobs:
           sudo apt-get install -y \
             build-essential autoconf automake libtool pkg-config \
             cmake patch unzip zip libssl-dev libffi-dev zlib1g-dev \
-            openjdk-17-jdk m4 libboost-all-dev autoconf-archive
+            openjdk-17-jdk m4 libboost-all-dev
 
-      - name: Clean & Prep
-        run: |
-          # Links macros and clears any stuck locks from previous failures
-          sudo ln -s /usr/share/aclocal /usr/local/share/aclocal || true
-          rm -rf .buildozer/
-
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Build Android APK
+      - name: Install Buildozer & Cython
         run: |
           pip install --upgrade pip
-          # Cython 0.29.33 is the only version that reliably compiles libtorrent
-          pip install "Cython==0.29.33" buildozer setuptools
-          yes | buildozer -v android debug
+          pip install "Cython<3.0" buildozer setuptools
+
+      - name: Build Android APK
+        run: |
+          # Clean old artifacts to ensure a fresh C++ compilation
+          rm -rf .buildozer/
+          # Running without 'yes |' to capture the real exit error
+          buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"
-          # Force the use of the clean NDK download
           ANDROID_NDK_HOME: "" 
 
       - name: Upload APK

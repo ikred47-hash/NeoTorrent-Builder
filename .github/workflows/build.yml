@@ -35,10 +35,12 @@ jobs:
       # 3. CRITICAL FIXES: Symlinks & Intent Filters
       - name: Prepare Environment
         run: |
-          # Fix 1: Create python3.9 symlink so the compiler can find it
-          PY39_PATH=$(find /opt/hostedtoolcache/Python/3.9* -name bin -type d | head -n 1)
-          echo "$PY39_PATH" >> $GITHUB_PATH
-          sudo ln -s "$PY39_PATH/python" /usr/bin/python3.9 || true
+          # Fix 1: Register Python 3.9 so the compiler can find it
+          # We find the exact path where GitHub installed Python 3.9
+          PY39_BIN=$(find /opt/hostedtoolcache/Python/3.9* -name bin -type d | head -n 1)
+          echo "$PY39_BIN" >> $GITHUB_PATH
+          # Create a global symlink just in case
+          sudo ln -s "$PY39_BIN/python" /usr/bin/python3.9 || true
           
           # Fix 2: Create external Intent Filters file to stop the parsing crash
           echo '[{"action": "android.intent.action.VIEW", "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"], "data": {"scheme": "magnet"}}]' > intent_filters.json

@@ -7,7 +7,6 @@ on:
 
 jobs:
   build:
-    # Ubuntu 22.04 is currently more stable for NDK cross-compilation than 24.04
     runs-on: ubuntu-22.04
 
     steps:
@@ -20,11 +19,11 @@ jobs:
           sudo apt-get install -y \
             build-essential autoconf automake libtool pkg-config \
             cmake patch unzip zip libssl-dev libffi-dev zlib1g-dev \
-            openjdk-17-jdk m4 libboost-all-dev libncurses5
+            openjdk-17-jdk m4 libboost-all-dev autoconf-archive
 
       - name: Fix Autotools Macro Paths
         run: |
-          # Links the required m4 macros for the libtorrent autoreconf step
+          # Links macros to ensure autoreconf finds AC_PROG_LIBTOOL
           sudo ln -s /usr/share/aclocal /usr/local/share/aclocal || true
 
       - name: Set up Python 3.11
@@ -32,21 +31,21 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Buildozer & Fixed Cython
+      - name: Install Buildozer & Cython
         run: |
           pip install --upgrade pip
-          # Cython 0.29.33 is essential for the libtorrent C++ bindings
+          # Pinned Cython 0.29.33 is the gold standard for libtorrent compilation
           pip install "Cython==0.29.33" buildozer setuptools
 
       - name: Build Android APK
         run: |
-          # Delete any previous failed build data to prevent "Broken Pipe" errors
+          # Clean old failed artifacts and trigger fresh build
           rm -rf .buildozer/
           yes | buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"
-          # Ensure the build ignores the runner's pre-installed NDK 27
+          # Isolates the build from GitHub's pre-installed NDK 27.x
           ANDROID_NDK_HOME: "" 
 
       - name: Upload APK Artifact

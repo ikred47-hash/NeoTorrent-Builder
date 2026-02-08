@@ -22,7 +22,7 @@ android.accept_sdk_license = True
 
 android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, FOREGROUND_SERVICE
 
-# FIX: Reference the external JSON file
+# FIX: Reference the external JSON file, NOT the raw string
 android.manifest.intent_filters = intent_filters.json
 
 [buildozer]

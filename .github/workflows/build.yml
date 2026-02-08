@@ -22,41 +22,31 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            autoconf \
-            automake \
-            libtool \
-            pkg-config \
-            cmake \
-            patch \
-            unzip \
-            zip \
-            libssl-dev \
-            libffi-dev \
-            zlib1g-dev \
-            openjdk-17-jdk \
-            m4
+            build-essential autoconf automake libtool pkg-config \
+            cmake patch unzip zip libssl-dev libffi-dev zlib1g-dev \
+            openjdk-17-jdk m4
 
-      - name: Fix Autoreconf Macros
+      - name: Fix Autoreconf & NDK Path
         run: |
-          # This links the libtool macros to where autoconf expects them
+          # Link macros and clear any stuck build locks
           sudo ln -s /usr/share/aclocal /usr/local/share/aclocal || true
+          rm -rf .buildozer/android/platform/build-arm64-v8a/dists/neoonyx || true
 
-      - name: Install Buildozer & Fixed Cython
+      - name: Install Buildozer & Stable Cython
         run: |
           pip install --upgrade pip
-          # Pinning Cython 0.29.33 is often the 'silver bullet' for libtorrent recipes
+          # Using Cython 0.29.33 is non-negotiable for older libtorrent recipes
           pip install "Cython==0.29.33" buildozer setuptools
 
       - name: Build Android APK
         run: |
-          # Force the use of NDK 26b specifically
+          # We tell Buildozer to strictly use its own NDK download to avoid 27.3 conflicts
           yes | buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"
-          # Ensure pkg-config knows where the host libs are
-          PKG_CONFIG_PATH: "/usr/lib/x86_64-linux-gnu/pkgconfig"
+          # This forces p4a to ignore the system NDK 27 and use the one we want
+          ANDROID_NDK_HOME: "" 
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

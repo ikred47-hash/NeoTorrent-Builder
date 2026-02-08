@@ -12,29 +12,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 1. CRITICAL: Switch to Java 17 (Required by Android Gradle Plugin)
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential autoconf automake libtool pkg-config \
             cmake patch unzip zip libssl-dev libffi-dev zlib1g-dev \
-            openjdk-17-jdk m4 libboost-all-dev autoconf-archive
+            libboost-all-dev autoconf-archive
 
-      # 1. Install Python 3.9 (Target for App)
+      # 2. Install Python 3.9 (Target for App)
       - name: Set up Python 3.9
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
-      # 2. Link Python 3.9 so Buildozer can find it
+      # 3. Link Python 3.9 so Buildozer can find it
       - name: Link Python 3.9
         run: |
-          # Find where GitHub installed Python 3.9 and symlink it to /usr/bin/python3.9
           PY39_BIN=$(find /opt/hostedtoolcache/Python/3.9* -name bin -type d | head -n 1)
           sudo ln -sf "$PY39_BIN/python" /usr/bin/python3.9
           echo "$PY39_BIN" >> $GITHUB_PATH
 
-      # 3. Install Python 3.11 (Runner for Buildozer)
+      # 4. Install Python 3.11 (Runner for Buildozer)
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -47,25 +53,24 @@ jobs:
 
       - name: Build Android APK
         run: |
-          # 1. Clean
+          # Clean slate
           rm -rf .buildozer/
           
-          # 2. CRITICAL: Generate the Intent Filters File
-          # This creates the file locally so Buildozer doesn't crash reading the string
+          # Create the Intent Filters File
           echo '[{"action": "android.intent.action.VIEW", "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"], "data": {"scheme": "magnet"}}]' > intent_filters.json
           
-          # 3. Init Buildozer
+          # Init
           buildozer android p4a -- --help || true
           
-          # 4. Manual License Fix
+          # Manual License Fix
           mkdir -p .buildozer/android/platform/android-sdk/licenses
           echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > .buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "d56f5187479451eabf01fb74abc6b790403a4b4e" >> .buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "24333f8a63b6b36a1e7d3d976412fd7a56e7f050" >> .buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "84831b9409646a918e30573bab4c9c91346d8abd" > .buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
           
-          # 5. Build (Using 'yes' to be safe, now that we fixed the crash)
-          yes | buildozer -v android debug
+          # Final Build (No 'yes' pipe needed as licenses are manually handled)
+          buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"

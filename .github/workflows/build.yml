@@ -20,22 +20,28 @@ jobs:
             cmake patch unzip zip libssl-dev libffi-dev zlib1g-dev \
             openjdk-17-jdk m4 libboost-all-dev autoconf-archive
 
-      # 1. Install Python 3.9 (The target version for the App)
+      # 1. Install Python 3.9 (Target for App)
       - name: Set up Python 3.9
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
-      # 2. Install Python 3.11 (The version to run Buildozer)
-      # This will become the default 'python', but 'python3.9' will still be available.
+      # 2. Install Python 3.11 (Runner for Buildozer)
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3. CRITICAL FIX: Add Python 3.9 to PATH manually so the compiler can find it
-      - name: Register Python 3.9 Path
-        run: echo "/opt/hostedtoolcache/Python/3.9.21/x64/bin" >> $GITHUB_PATH
+      # 3. CRITICAL FIXES: Symlinks & Intent Filters
+      - name: Prepare Environment
+        run: |
+          # Fix 1: Create python3.9 symlink so the compiler can find it
+          PY39_PATH=$(find /opt/hostedtoolcache/Python/3.9* -name bin -type d | head -n 1)
+          echo "$PY39_PATH" >> $GITHUB_PATH
+          sudo ln -s "$PY39_PATH/python" /usr/bin/python3.9 || true
+          
+          # Fix 2: Create external Intent Filters file to stop the parsing crash
+          echo '[{"action": "android.intent.action.VIEW", "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"], "data": {"scheme": "magnet"}}]' > intent_filters.json
 
       - name: Install Build Tools
         run: |
@@ -44,21 +50,20 @@ jobs:
 
       - name: Build Android APK
         run: |
-          # 1. Clean previous builds
+          # 1. Clean
           rm -rf .buildozer/
           
-          # 2. Trigger SDK/NDK download
+          # 2. Init
           buildozer android p4a -- --help || true
           
-          # 3. MANUAL LICENSE ACCEPTANCE (Prevents the hang)
+          # 3. Manual License Fix
           mkdir -p .buildozer/android/platform/android-sdk/licenses
           echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > .buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "d56f5187479451eabf01fb74abc6b790403a4b4e" >> .buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "24333f8a63b6b36a1e7d3d976412fd7a56e7f050" >> .buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "84831b9409646a918e30573bab4c9c91346d8abd" > .buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
           
-          # 4. FINAL BUILD (Native Python 3.9 compilation)
-          # We do NOT use 'yes |' here because the manual licenses handle the prompts.
+          # 4. Build (No pipe, allow full log output)
           buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"

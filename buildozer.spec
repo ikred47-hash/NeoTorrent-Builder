@@ -6,20 +6,20 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 1.0.0
 
-# REQUIREMENTS: hostpython3 is mandatory for libtorrent C++ linking
+# REQUIREMENTS: hostpython3 is critical for cross-compiling libtorrent
 requirements = python3, kivy==2.3.0, libtorrent, openssl, requests, certifi, chardet, idna, urllib3, hostpython3
 
-# CRITICAL: Switch to develop branch for latest recipe patches
+# CRITICAL BRANCH: Use develop for 2026 recipe fixes
 p4a.branch = develop
 
-# ANDROID CONFIGURATION (Targeting API 34 for Play Store standards)
+# ANDROID SETTINGS
 android.api = 34
 android.minapi = 21
 android.ndk = 25b
 android.ndk_api = 21
 android.archs = arm64-v8a
 
-# PERMISSIONS & BROWSER INTERCEPT
+# PERMISSIONS & INTENTS
 android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, FOREGROUND_SERVICE
 android.manifest.intent_filters = [ \
     {"action": "android.intent.action.VIEW", \

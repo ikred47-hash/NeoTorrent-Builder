@@ -6,17 +6,13 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 1.0.0
 
-# PINNED: python3==3.9.16 avoids all C++ compilation errors
+# PINNED: python3==3.9.16 for stability
 requirements = python3==3.9.16, kivy==2.3.0, libtorrent, openssl, requests, certifi, chardet, idna, urllib3, hostpython3
 
-# Using master branch for the best Android 16 support
 p4a.branch = master
-
-# Screen settings
 orientation = portrait
 fullscreen = 1
 
-# Android Config
 android.api = 34
 android.minapi = 21
 android.ndk = 25b
@@ -24,12 +20,10 @@ android.ndk_api = 21
 android.archs = arm64-v8a
 android.accept_sdk_license = True
 
-# Permissions & Intents
 android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, FOREGROUND_SERVICE
-android.manifest.intent_filters = [ \
-    {"action": "android.intent.action.VIEW", \
-     "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"], \
-     "data": {"scheme": "magnet"}}]
+
+# FIX: Reference the external JSON file
+android.manifest.intent_filters = intent_filters.json
 
 [buildozer]
 log_level = 2

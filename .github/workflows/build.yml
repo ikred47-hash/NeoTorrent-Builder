@@ -33,20 +33,22 @@ jobs:
 
       - name: Build Android APK
         run: |
+          # 1. Clean
           rm -rf .buildozer/
-          # 1. Download recipes and SDK tools
+          
+          # 2. Download tools
           buildozer android p4a -- --help || true
           
-          # 2. IRONCLAD LICENSE FIX: Manually create license confirmation files
+          # 3. IRONCLAD LICENSE FIX
           mkdir -p /home/runner/.buildozer/android/platform/android-sdk/licenses
           printf "8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb74abc6b790403a4b4e\n24333f8a63b6b36a1e7d3d976412fd7a56e7f050" > /home/runner/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
           printf "84831b9409646a918e30573bab4c9c91346d8abd\n5046675910430656513" > /home/runner/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
           
-          # 3. SURGICAL PATCH: Fix Boost headers for Python 3.11 compatibility
+          # 4. SURGICAL PATCH for Python 3.11
           find .buildozer -name "make_instance.hpp" -exec sed -i 's/Py_SIZE(instance) = \(.*\);/Py_SET_SIZE(instance, \1);/g' {} + || true
           
-          # 4. Final Build
-          buildozer -v android debug
+          # 5. Build with 'yes |' to catch any sub-prompts
+          yes | buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"

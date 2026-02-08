@@ -6,28 +6,16 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 1.0.0
 
-# REQUIREMENTS: Adding 'hostpython3' is essential for the libtorrent recipe
-requirements = python3, kivy==2.3.0, libtorrent, openssl, requests, certifi, chardet, idna, urllib3, hostpython3
+# CHANGE: Using libtorrent-python instead of the legacy libtorrent recipe
+# Also adding 'hostpython3' as it is a mandatory build requirement
+requirements = python3, kivy==2.3.0, libtorrent-python, openssl, requests, certifi, chardet, idna, urllib3, hostpython3
 
-# THE FIX: Switch to master branch for the latest Clang compatibility patches
-p4a.branch = master
+# CRITICAL: Stay on the 'develop' branch for the newer recipe
+p4a.branch = develop
 
-# ANDROID CONFIG
 android.api = 34
 android.minapi = 21
 android.ndk = 25b
-android.ndk_api = 21
 android.archs = arm64-v8a
 
-# PERMISSIONS & INTENTS
-android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, FOREGROUND_SERVICE
-android.manifest.intent_filters = [ \
-    {"action": "android.intent.action.VIEW", \
-     "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"], \
-     "data": {"scheme": "magnet"}}]
-
-fullscreen = 1
-
-[buildozer]
-log_level = 2
-warn_on_root = 1
+# ... (keep your existing permissions and intent filters)

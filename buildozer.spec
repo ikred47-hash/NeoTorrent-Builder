@@ -6,13 +6,13 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 1.0.0
 
-# REQUIREMENTS: hostpython3 is critical for cross-compiling libtorrent
+# REQUIREMENTS: Adding 'hostpython3' is essential for the libtorrent recipe
 requirements = python3, kivy==2.3.0, libtorrent, openssl, requests, certifi, chardet, idna, urllib3, hostpython3
 
-# CRITICAL BRANCH: Use develop for 2026 recipe fixes
-p4a.branch = develop
+# THE FIX: Switch to master branch for the latest Clang compatibility patches
+p4a.branch = master
 
-# ANDROID SETTINGS
+# ANDROID CONFIG
 android.api = 34
 android.minapi = 21
 android.ndk = 25b

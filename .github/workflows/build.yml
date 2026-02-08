@@ -26,12 +26,13 @@ jobs:
         with:
           python-version: '3.9'
 
-      # 2. CRITICAL: Create 'python3.9' command link
-      # The build script demands 'python3.9' specifically, so we trick it.
+      # 2. Link Python 3.9 so Buildozer can find it
       - name: Link Python 3.9
         run: |
-          sudo ln -sf $(which python) /usr/bin/python3.9
-          python3.9 --version
+          # Find where GitHub installed Python 3.9 and symlink it to /usr/bin/python3.9
+          PY39_BIN=$(find /opt/hostedtoolcache/Python/3.9* -name bin -type d | head -n 1)
+          sudo ln -sf "$PY39_BIN/python" /usr/bin/python3.9
+          echo "$PY39_BIN" >> $GITHUB_PATH
 
       # 3. Install Python 3.11 (Runner for Buildozer)
       - name: Set up Python 3.11
@@ -49,7 +50,8 @@ jobs:
           # 1. Clean
           rm -rf .buildozer/
           
-          # 2. Create the Intent Filters File (Fixes FileNotFoundError)
+          # 2. CRITICAL: Generate the Intent Filters File
+          # This creates the file locally so Buildozer doesn't crash reading the string
           echo '[{"action": "android.intent.action.VIEW", "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"], "data": {"scheme": "magnet"}}]' > intent_filters.json
           
           # 3. Init Buildozer
@@ -62,7 +64,7 @@ jobs:
           echo "24333f8a63b6b36a1e7d3d976412fd7a56e7f050" >> .buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "84831b9409646a918e30573bab4c9c91346d8abd" > .buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
           
-          # 5. Build (Using 'yes' pipe again safely now that Python is fixed)
+          # 5. Build (Using 'yes' to be safe, now that we fixed the crash)
           yes | buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"

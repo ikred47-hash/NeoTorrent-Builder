@@ -23,7 +23,7 @@ jobs:
 
       - name: Fix Autotools Macro Paths
         run: |
-          # Links macros to ensure autoreconf finds AC_PROG_LIBTOOL
+          # Links macros so autoreconf can find libtoolize definitions
           sudo ln -s /usr/share/aclocal /usr/local/share/aclocal || true
 
       - name: Set up Python 3.11
@@ -34,18 +34,18 @@ jobs:
       - name: Install Buildozer & Cython
         run: |
           pip install --upgrade pip
-          # Pinned Cython 0.29.33 is the gold standard for libtorrent compilation
+          # Pinned Cython 0.29.33 ensures stable C++ code generation
           pip install "Cython==0.29.33" buildozer setuptools
 
       - name: Build Android APK
         run: |
-          # Clean old failed artifacts and trigger fresh build
+          # Clean old corrupted artifacts and trigger build
           rm -rf .buildozer/
           yes | buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"
-          # Isolates the build from GitHub's pre-installed NDK 27.x
+          # Ignores system NDK to prevent architecture conflicts
           ANDROID_NDK_HOME: "" 
 
       - name: Upload APK Artifact

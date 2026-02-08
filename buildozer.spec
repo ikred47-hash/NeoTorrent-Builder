@@ -6,7 +6,7 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 1.0.0
 
-# PINNED: python3==3.9.16 is the "Golden Version" for libtorrent stability
+# PINNED: python3==3.9.16 avoids all C++ compilation errors
 requirements = python3==3.9.16, kivy==2.3.0, libtorrent, openssl, requests, certifi, chardet, idna, urllib3, hostpython3
 
 # Using master branch for the best Android 16 support

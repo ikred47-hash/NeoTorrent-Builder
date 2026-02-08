@@ -3,7 +3,7 @@ name: NeoOnyx Fusion Production Build
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # Allows you to trigger the build manually from the GitHub app
+  workflow_dispatch:
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.11.14'
 
       - name: Install Native Build Dependencies
         run: |
@@ -33,29 +33,33 @@ jobs:
             zip \
             libssl-dev \
             libffi-dev \
-            libncurses5-dev \
-            libncursesw5-dev \
             zlib1g-dev \
-            openjdk-17-jdk
+            openjdk-17-jdk \
+            m4
 
-      - name: Install Buildozer & Cython
+      - name: Fix Autoreconf Macros
+        run: |
+          # This links the libtool macros to where autoconf expects them
+          sudo ln -s /usr/share/aclocal /usr/local/share/aclocal || true
+
+      - name: Install Buildozer & Fixed Cython
         run: |
           pip install --upgrade pip
-          pip install buildozer "cython<3.0" setuptools
+          # Pinning Cython 0.29.33 is often the 'silver bullet' for libtorrent recipes
+          pip install "Cython==0.29.33" buildozer setuptools
 
       - name: Build Android APK
         run: |
-          # The 'yes' command auto-accepts Android SDK licenses
+          # Force the use of NDK 26b specifically
           yes | buildozer -v android debug
         env:
-          # Optimization for iQOO Neo 10 (Snapdragon 8s Gen 4)
-          # We force the build for the arm64 architecture
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"
+          # Ensure pkg-config knows where the host libs are
+          PKG_CONFIG_PATH: "/usr/lib/x86_64-linux-gnu/pkgconfig"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: NeoOnyx-Beta-v1
           path: bin/*.apk
-          retention-days: 7

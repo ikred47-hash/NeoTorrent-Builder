@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04 # Switching to 22.04 is the most reliable "fix" for Buildozer in 2026
 
     steps:
       - name: Checkout Code
@@ -16,40 +16,40 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11.14'
+          python-version: '3.11'
 
-      - name: Install Native Build Dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential autoconf automake libtool pkg-config \
             cmake patch unzip zip libssl-dev libffi-dev zlib1g-dev \
-            openjdk-17-jdk m4
+            openjdk-17-jdk m4 libncurses5
 
-      - name: Fix Autoreconf & NDK Path
+      - name: Clean & Prep Build Environment
         run: |
-          # Link macros and clear any stuck build locks
-          sudo ln -s /usr/share/aclocal /usr/local/share/aclocal || true
-          rm -rf .buildozer/android/platform/build-arm64-v8a/dists/neoonyx || true
+          # Kill any existing build locks and old artifacts
+          rm -rf .buildozer/
+          mkdir -p .buildozer/android/platform/
 
-      - name: Install Buildozer & Stable Cython
+      - name: Install Buildozer & Cython
         run: |
           pip install --upgrade pip
-          # Using Cython 0.29.33 is non-negotiable for older libtorrent recipes
+          # Cython 0.29.33 is essential for the libtorrent recipe to compile correctly
           pip install "Cython==0.29.33" buildozer setuptools
 
       - name: Build Android APK
         run: |
-          # We tell Buildozer to strictly use its own NDK download to avoid 27.3 conflicts
+          # Force a deep-clean and then build
           yes | buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"
-          # This forces p4a to ignore the system NDK 27 and use the one we want
+          # Hide NDK 27 from the build tools
           ANDROID_NDK_HOME: "" 
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NeoOnyx-Beta-v1
+          name: NeoOnyx-Stable-Beta
           path: bin/*.apk

@@ -4,7 +4,7 @@ from kivy.app import App
 from kivy.lang import Builder
 from kivy.utils import platform
 from kivy.clock import Clock
-from kivy.properties import StringProperty, ListProperty
+from kivy.properties import StringProperty
 from kivy.uix.screenmanager import Screen, ScreenManager
 
 if platform == 'android':
@@ -129,7 +129,10 @@ class NeoOnyxApp(App):
                 self.add_torrent(link)
 
     def add_torrent(self, link):
-        params = {'save_path': "/storage/emulated/0/Download"}
+        save_path = "/storage/emulated/0/Download"
+        if not os.path.exists(save_path):
+            save_path = "."
+        params = {'save_path': save_path}
         handle = lt.add_magnet_uri(self.ses, link, params)
         handle.set_sequential_download(True)
         self.handles.append(handle)

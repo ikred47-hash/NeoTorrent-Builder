@@ -26,24 +26,18 @@ jobs:
         with:
           python-version: '3.9'
 
-      # 2. Install Python 3.11 (Runner for Buildozer)
+      # 2. CRITICAL: Create 'python3.9' command link
+      # The build script demands 'python3.9' specifically, so we trick it.
+      - name: Link Python 3.9
+        run: |
+          sudo ln -sf $(which python) /usr/bin/python3.9
+          python3.9 --version
+
+      # 3. Install Python 3.11 (Runner for Buildozer)
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      # 3. CRITICAL FIXES: Symlinks & Intent Filters
-      - name: Prepare Environment
-        run: |
-          # Fix 1: Register Python 3.9 so the compiler can find it
-          # We find the exact path where GitHub installed Python 3.9
-          PY39_BIN=$(find /opt/hostedtoolcache/Python/3.9* -name bin -type d | head -n 1)
-          echo "$PY39_BIN" >> $GITHUB_PATH
-          # Create a global symlink just in case
-          sudo ln -s "$PY39_BIN/python" /usr/bin/python3.9 || true
-          
-          # Fix 2: Create external Intent Filters file to stop the parsing crash
-          echo '[{"action": "android.intent.action.VIEW", "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"], "data": {"scheme": "magnet"}}]' > intent_filters.json
 
       - name: Install Build Tools
         run: |
@@ -55,18 +49,21 @@ jobs:
           # 1. Clean
           rm -rf .buildozer/
           
-          # 2. Init
+          # 2. Create the Intent Filters File (Fixes FileNotFoundError)
+          echo '[{"action": "android.intent.action.VIEW", "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"], "data": {"scheme": "magnet"}}]' > intent_filters.json
+          
+          # 3. Init Buildozer
           buildozer android p4a -- --help || true
           
-          # 3. Manual License Fix
+          # 4. Manual License Fix
           mkdir -p .buildozer/android/platform/android-sdk/licenses
           echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > .buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "d56f5187479451eabf01fb74abc6b790403a4b4e" >> .buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "24333f8a63b6b36a1e7d3d976412fd7a56e7f050" >> .buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "84831b9409646a918e30573bab4c9c91346d8abd" > .buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
           
-          # 4. Build (No pipe, allow full log output)
-          buildozer -v android debug
+          # 5. Build (Using 'yes' pipe again safely now that Python is fixed)
+          yes | buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"

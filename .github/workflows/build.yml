@@ -10,8 +10,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install System Dependencies
         run: |
@@ -33,23 +32,25 @@ jobs:
 
       - name: Build Android APK
         run: |
-          # 1. Clean and Start Download
+          # 1. Clear old corrupted build data
           rm -rf .buildozer/
+          
+          # 2. Download recipes without starting full build
           buildozer android p4a -- --help || true
           
-          # 2. Auto-accept Licenses
-          yes | /home/runner/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --sdk_root=/home/runner/.buildozer/android/platform/android-sdk --licenses || true
-          
-          # 3. SURGICAL PATCH: Fix the 'Py_SIZE' error in Boost before it compiles
-          # This command finds the file and changes 'Py_SIZE(obj) = val' to 'Py_SET_SIZE(obj, val)'
+          # 3. SURGICAL PATCH: Fix Python 3.11 compatibility in Boost
+          # This replaces the unassignable Py_SIZE with the modern Py_SET_SIZE
+          echo "Applying Python 3.11 Boost Patch..."
           find .buildozer -name "make_instance.hpp" -exec sed -i 's/Py_SIZE(instance) = \(.*\);/Py_SET_SIZE(instance, \1);/g' {} + || true
-
-          # 4. Final Compilation
+          
+          # 4. Auto-accept licenses and start compilation
+          yes | /home/runner/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --sdk_root=/home/runner/.buildozer/android/platform/android-sdk --licenses || true
           buildozer -v android debug
         env:
           APP_ANDROID_ARCHS: "arm64-v8a"
           GRADLE_OPTS: "-Xmx4g"
           ANDROID_NDK_HOME: ""
+          # Tell the compiler to be less aggressive with warnings
           CXXFLAGS: "-Wno-error=enum-enum-conversion -Wno-error=deprecated-declarations"
 
       - name: Upload APK

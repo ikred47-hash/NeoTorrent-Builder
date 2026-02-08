@@ -1,229 +1,163 @@
 import os
+import time
+import libtorrent as lt
 from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.button import Button
-from kivy.uix.togglebutton import ToggleButton
-from kivy.uix.textinput import TextInput
-from kivy.uix.label import Label
-from kivy.uix.progressbar import ProgressBar
-from kivy.uix.scrollview import ScrollView
-from kivy.uix.popup import Popup
-from kivy.uix.image import AsyncImage
-from kivy.clock import Clock
-from kivy.graphics import Color, Rectangle, RoundedRectangle
+from kivy.lang import Builder
 from kivy.utils import platform
-from kivy.core.window import Window
-from kivy.metrics import dp
-import random
-import requests
+from kivy.clock import Clock
+from kivy.properties import StringProperty, ListProperty
+from kivy.uix.screenmanager import Screen, ScreenManager
 
-# --- SAFE IMPORT: Torrent Engine ---
-try:
-    import libtorrent as lt
-    ENGINE_AVAILABLE = True
-except ImportError:
-    ENGINE_AVAILABLE = False
+# Register Android-specific intents if on mobile
+if platform == 'android':
+    from jnius import autoclass
+    from android.activity import bind as android_bind
 
-# --- THEME (Cyber-Onyx) ---
-COLOR_BG = (0.05, 0.05, 0.07, 1)
-COLOR_CARD = (0.12, 0.14, 0.18, 1)
-COLOR_ACCENT_BLUE = (0, 0.85, 1, 1)     # Network
-COLOR_ACCENT_PURPLE = (0.7, 0, 1, 1)    # Neural
-COLOR_TEXT_MAIN = (1, 1, 1, 1)
-COLOR_TEXT_SUB = (0.7, 0.7, 0.8, 1)
+# --- UI DESIGN (Minimalist 2026) ---
+KV = '''
+<TorrentCard@BoxLayout>:
+    orientation: 'vertical'
+    padding: dp(16)
+    spacing: dp(8)
+    size_hint_y: None
+    height: dp(140)
+    canvas.before:
+        Color:
+            rgba: (0.15, 0.15, 0.15, 1)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(16),]
 
-class RoundedButton(Button):
-    def __init__(self, btn_color=COLOR_ACCENT_BLUE, radius=[10], **kwargs):
-        self.btn_color = btn_color
-        self.radius = radius
-        super().__init__(**kwargs)
-        self.background_normal = ''
-        self.background_color = (0,0,0,0)
-        self.bold = True
-        self.bind(pos=self.update_canvas, size=self.update_canvas)
+    Label:
+        text: root.title
+        font_size: '18sp'
+        bold: True
+        shorten: True
+        shorten_from: 'right'
+        text_size: self.width, None
 
-    def update_canvas(self, *args):
-        if not self.canvas: return
-        if self.pos[1] < 1: return
-        self.canvas.before.clear()
-        with self.canvas.before:
-            Color(rgba=self.btn_color)
-            RoundedRectangle(pos=self.pos, size=self.size, radius=self.radius)
+    ProgressBar:
+        max: 100
+        value: root.progress
+        size_hint_y: None
+        height: dp(4)
 
-class NavButton(ToggleButton):
-    def __init__(self, text, icon, app_ref, mode, **kwargs):
-        self.app = app_ref
-        self.mode = mode
-        super().__init__(**kwargs)
-        self.text = f"{icon}  {text}"
-        self.group = 'nav'
-        self.background_normal = ''
-        self.background_down = ''
-        self.background_color = (0,0,0,0)
-        self.allow_no_selection = False
-        self.bind(state=self.on_state, pos=self.update_canvas, size=self.update_canvas)
-        if self.state == 'down':
-            self.on_state(self, 'down')
+    BoxLayout:
+        size_hint_y: None
+        height: dp(30)
+        Label:
+            text: str(int(root.progress)) + "%"
+            font_size: '13sp'
+            color: 0.7, 0.7, 0.7, 1
+        Label:
+            text: root.speed + " MB/s"
+            halign: 'right'
+            color: 0.3, 0.8, 0.3, 1
 
-    def on_state(self, instance, value):
-        if value == 'down':
-            self.app.switch_tab(self.mode)
-            self.color = COLOR_ACCENT_BLUE if self.mode == 'network' else COLOR_ACCENT_PURPLE
-        else:
-            self.color = COLOR_TEXT_SUB
-        self.update_canvas()
+<MainScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(20)
+        spacing: dp(15)
+        canvas.before:
+            Color:
+                rgba: 0.08, 0.08, 0.08, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
 
-    def update_canvas(self, *args):
-        if not self.canvas: return
-        self.canvas.before.clear()
-        with self.canvas.before:
-            if self.state == 'down':
-                Color(rgba=self.color)
-                RoundedRectangle(pos=(self.x + dp(20), self.y), size=(self.width - dp(40), dp(2)), radius=[1])
+        Label:
+            text: "NeoOnyx Fusion"
+            font_size: '24sp'
+            bold: True
+            size_hint_y: None
+            height: dp(40)
+            halign: 'left'
+            text_size: self.size
 
-class TorrentCard(BoxLayout):
-    def __init__(self, handle, **kwargs):
-        super().__init__(**kwargs)
-        self.handle = handle
-        self.orientation = 'vertical'
-        self.size_hint_y = None
-        self.height = dp(110)
-        self.padding = dp(15)
-        with self.canvas.before:
-            Color(rgba=COLOR_CARD)
-            self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[15])
-        self.bind(pos=self.update_rect, size=self.update_rect)
+        # Search Bar
+        TextInput:
+            id: search_input
+            hint_text: "Search or Paste Magnet Link..."
+            multiline: False
+            size_hint_y: None
+            height: dp(50)
+            padding: [dp(15), dp(15)]
+            background_color: 0.15, 0.15, 0.15, 1
+            foreground_color: 1, 1, 1, 1
 
-        self.title_lbl = Label(text="Initializing...", bold=True, halign='left', size_hint_y=None, height=dp(25))
-        self.title_lbl.bind(size=self.title_lbl.setter('text_size'))
-        self.add_widget(self.title_lbl)
+        RecycleView:
+            id: rv
+            viewclass: 'TorrentCard'
+            RecycleBoxLayout:
+                default_size: None, dp(150)
+                default_size_hint: 1, None
+                size_hint_y: None
+                height: self.minimum_height
+                orientation: 'vertical'
+                spacing: dp(15)
 
-        self.progress = ProgressBar(max=100, value=0, size_hint_y=None, height=dp(10))
-        self.add_widget(self.progress)
+'''
 
-        self.stats_lbl = Label(text="0 KB/s", color=COLOR_ACCENT_BLUE, font_size='12sp', halign='left')
-        self.stats_lbl.bind(size=self.stats_lbl.setter('text_size'))
-        self.add_widget(self.stats_lbl)
+class MainScreen(Screen):
+    pass
 
-    def update_rect(self, *args):
-        self.rect.pos = self.pos
-        self.rect.size = self.size
+class NeoOnyxApp(App):
+    torrents_data = ListProperty([])
 
-class NeuralPanel(BoxLayout):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.orientation = 'vertical'
-        self.padding = dp(20)
-        self.spacing = dp(15)
-        
-        self.image_display = AsyncImage(source='', allow_stretch=True, keep_ratio=True)
-        self.image_display.bind(on_load=self.on_image_loaded)
-        self.add_widget(self.image_display)
-
-        self.status_lbl = Label(text="[ NPU STANDBY ]", color=COLOR_TEXT_SUB, size_hint_y=None, height=dp(40))
-        self.add_widget(self.status_lbl)
-
-        self.prompt_in = TextInput(hint_text="Describe your dream...", multiline=False, size_hint_y=None, height=dp(50),
-                                   background_color=(0.18, 0.18, 0.2, 1), foreground_color=(1,1,1,1))
-        self.add_widget(self.prompt_in)
-
-        self.gen_btn = RoundedButton(text="DREAM (Snapdragon 8s Gen 4)", btn_color=COLOR_ACCENT_PURPLE, size_hint_y=None, height=dp(60))
-        self.gen_btn.bind(on_press=self.generate_ai)
-        self.add_widget(self.gen_btn)
-
-    def generate_ai(self, instance):
-        if not self.prompt_in.text: return
-        instance.disabled = True
-        self.status_lbl.text = "⚡ TRANSMITTING PROMPT ⚡"
-        seed = random.randint(1, 99999)
-        safe_prompt = requests.utils.quote(self.prompt_in.text)
-        self.image_display.source = f"https://image.pollinations.ai/prompt/{safe_prompt}?nologo=true&seed={seed}"
-
-    def on_image_loaded(self, instance):
-        self.gen_btn.disabled = False
-        self.status_lbl.text = "[ DREAM REALIZED ]"
-
-class NeoOnyx(App):
     def build(self):
-        Window.clearcolor = COLOR_BG
-        Window.softinput_mode = 'pan'
-        self.root = FloatLayout()
+        # 1. Initialize libtorrent session
+        self.ses = lt.session()
+        self.ses.listen_on(6881, 6891)
         
-        self.content_area = BoxLayout(padding=[0, 0, 0, dp(60)])
-        self.root.add_widget(self.content_area)
+        # 2. Battery/Disk Optimization for Android 16
+        settings = self.ses.get_settings()
+        settings['download_rate_limit'] = 0
+        settings['disk_io_write_mode'] = 2 # Disable OS cache to prevent system drain
+        self.ses.apply_settings(settings)
 
-        nav_bar = BoxLayout(size_hint_y=None, height=dp(60), pos_hint={'y': 0})
-        with nav_bar.canvas.before:
-            Color(rgba=COLOR_CARD)
-            self.nav_bg_rect = Rectangle(pos=nav_bar.pos, size=nav_bar.size)
-        nav_bar.bind(pos=self.update_nav_bg, size=self.update_nav_bg)
+        self.handles = []
+        Builder.load_string(KV)
+        sm = ScreenManager()
+        self.main_screen = MainScreen(name='main')
+        sm.add_widget(self.main_screen)
         
-        self.screen_network = BoxLayout(orientation='vertical')
-        self.init_network_ui()
-        self.screen_neural = NeuralPanel()
+        # Update UI every second
+        Clock.schedule_interval(self.update_status, 1)
+        return sm
 
-        self.btn_net = NavButton("NETWORK", "⬇", self, 'network', state='down')
-        self.btn_neu = NavButton("NEURAL", "🧠", self, 'neural')
-        nav_bar.add_widget(self.btn_net)
-        nav_bar.add_widget(self.btn_neu)
-        self.root.add_widget(nav_bar)
+    def on_start(self):
+        if platform == 'android':
+            android_bind(on_new_intent=self.process_intent)
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            intent = PythonActivity.mActivity.getIntent()
+            self.process_intent(intent)
 
-        self.cards = {}
-        if ENGINE_AVAILABLE:
-            self.ses = lt.session()
-            self.ses.listen_on(6881, 6891)
-            Clock.schedule_interval(self.update_loop, 1.0)
+    def process_intent(self, intent):
+        data = intent.getData()
+        if data:
+            link = data.toString()
+            if link.startswith("magnet:"):
+                self.add_torrent(link)
 
-        return self.root
+    def add_torrent(self, link):
+        save_path = "/storage/emulated/0/Download"
+        params = {'save_path': save_path}
+        handle = lt.add_magnet_uri(self.ses, link, params)
+        handle.set_sequential_download(True) # THE "ELITE" FEATURE
+        self.handles.append(handle)
 
-    def update_nav_bg(self, i, v):
-        self.nav_bg_rect.pos = i.pos
-        self.nav_bg_rect.size = i.size
-
-    def init_network_ui(self):
-        header = BoxLayout(size_hint_y=None, height=dp(60), padding=dp(15))
-        header.add_widget(Label(text="NeoOnyx Engine", font_size='22sp', bold=True, color=COLOR_ACCENT_BLUE))
-        add_btn = RoundedButton(text="+", size_hint=(None, None), size=(dp(45), dp(45)))
-        add_btn.bind(on_press=self.show_add_popup)
-        header.add_widget(add_btn)
-        self.screen_network.add_widget(header)
-        
-        self.scroll = ScrollView()
-        self.list_layout = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(10), padding=dp(10))
-        self.list_layout.bind(minimum_height=self.list_layout.setter('height'))
-        self.scroll.add_widget(self.list_layout)
-        self.screen_network.add_widget(self.scroll)
-
-    def switch_tab(self, mode):
-        self.content_area.clear_widgets()
-        self.content_area.add_widget(self.screen_network if mode == 'network' else self.screen_neural)
-
-    def show_add_popup(self, instance):
-        content = BoxLayout(orientation='vertical', padding=dp(15), spacing=dp(15))
-        link_in = TextInput(hint_text="Magnet Link...", multiline=False, size_hint_y=None, height=dp(50))
-        content.add_widget(link_in)
-        go_btn = RoundedButton(text="START DOWNLOAD")
-        go_btn.bind(on_press=lambda x: self.add_magnet(link_in.text))
-        content.add_widget(go_btn)
-        self.popup = Popup(title="Add Torrent", content=content, size_hint=(0.9, 0.4))
-        self.popup.open()
-
-    def add_magnet(self, link):
-        if ENGINE_AVAILABLE and "magnet:" in link:
-            params = {'save_path': '/storage/emulated/0/Download'}
-            handle = lt.add_magnet_uri(self.ses, link, params)
-            card = TorrentCard(handle)
-            self.list_layout.add_widget(card)
-            self.cards[handle] = card
-            self.popup.dismiss()
-
-    def update_loop(self, dt):
-        for handle, card in list(self.cards.items()):
-            s = handle.status()
-            if handle.has_metadata(): card.title_lbl.text = handle.get_torrent_info().name()
-            card.progress.value = s.progress * 100
-            card.stats_lbl.text = f"{s.download_rate / 1000:.1f} KB/s | Seeds: {s.num_seeds}"
+    def update_status(self, dt):
+        ui_list = []
+        for h in self.handles:
+            s = h.status()
+            ui_list.append({
+                'title': s.name if s.name else "Fetching Metadata...",
+                'progress': s.progress * 100,
+                'speed': f"{s.download_rate / 1000000:.2f}"
+            })
+        self.main_screen.ids.rv.data = ui_list
 
 if __name__ == '__main__':
-    NeoOnyx().run()
+    NeoOnyxApp().run()

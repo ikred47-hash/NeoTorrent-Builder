@@ -6,23 +6,21 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 1.0.0
 
-# REQUIREMENTS: Switched to 'libtorrent-python' for Python 3.11 compatibility
-requirements = python3, kivy==2.3.0, libtorrent-python, openssl, requests, certifi, chardet, idna, urllib3, hostpython3
+# REQUIREMENTS: Corrected to 'libtorrent' and pinned python3==3.11
+requirements = python3==3.11, kivy==2.3.0, libtorrent, openssl, requests, certifi, chardet, idna, urllib3, hostpython3
 
-# CRITICAL: Use develop branch for the latest recipe patches
-p4a.branch = develop
+# THE FIX: Master branch contains the 2026 C++ patches
+p4a.branch = master
 
-# ANDROID CONFIGURATION
+# ANDROID CONFIG
 android.api = 34
 android.minapi = 21
 android.ndk = 25b
 android.ndk_api = 21
 android.archs = arm64-v8a
 
-# PERMISSIONS
+# PERMISSIONS & INTENTS
 android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, FOREGROUND_SERVICE
-
-# BROWSER INTERCEPT (Magnet Link Handling)
 android.manifest.intent_filters = [ \
     {"action": "android.intent.action.VIEW", \
      "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"], \
